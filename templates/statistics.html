@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Professional Mental Health Dashboard</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js + zoom plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+
+  <!-- Feather icons -->
+  <script src="https://unpkg.com/feather-icons"></script>
+
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- FileSaver for CSV/PNG download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    /* subtle entrance animation */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px) }
+      to { opacity: 1; transform: translateY(0) }
+    }
+    .animate-fadeInUp { animation: fadeInUp .45s ease both; }
+
+    /* skeleton shimmer */
+    .skeleton {
+      background: linear-gradient(90deg, #e6f2ec 8%, #f6fbf8 30%, #e6f2ec 52%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite linear;
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    /* small helpers */
+    .card-focus:focus { outline: 3px solid rgba(34,197,94,0.18); outline-offset: 2px; }
+    .tab-active { border-bottom-width: 2px; border-color: #065f46; color: #065f46; }
+    /* accessible focus ring */
+    :focus { outline: 3px solid rgba(6,95,70,0.12); outline-offset: 2px; }
+
+    /* color-blind friendly palette (emerald + blue + amber) */
+    .theme-1 { color: #065f46; } /* primary */
+    .theme-2 { color: #0b5cff; } /* secondary */
+    .theme-3 { color: #b45309; } /* accent */
+
+    /* modal split view optionally */
+    .modal-right { width: 1100px; max-width: calc(100% - 3rem); display: flex; gap: 1rem; }
+    @media(max-width:1024px) {
+      .modal-right { flex-direction: column; width: 95%; }
+    }
+  </style>
+</head>
+<body class="bg-[#f6faf8] text-gray-800">
+
+<!-- NAV -->
+<nav class="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <i data-feather="bar-chart-2" class="w-6 h-6 text-emerald-700"></i>
+    <div>
+      <div class="text-lg font-bold theme-1">Mental Health Insights</div>
+      <div class="text-xs text-gray-500">Secure • Clinician-friendly • Research-oriented</div>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-4">
+    <div class="flex space-x-6 text-sm font-medium">
+      <a href="/journal" class="text-gray-600 hover:text-[#2f5930]">Journal</a>
+      <a href="/quiz" class="text-gray-600 hover:text-[#2f5930]">Quiz</a>
+      <a href="/stats" class="text-gray-600 hover:text-[#2f5930]">Statistics</a>
+      <a href="/info" class="text-gray-600 hover:text-[#2f5930]">Info</a>
+      <a href="connections.html">Connections</a>
+    </div>
+  </div>
+</nav>
+
+<main class="max-w-7xl mx-auto px-6 py-8">
+  <!-- Header -->
+  <header class="text-center mb-8 animate-fadeInUp">
+    <h1 class="text-4xl font-extrabold theme-1">Analytics & Reporting</h1>
+    <p class="text-gray-600 mt-1">Designed for clinicians — compare patients, dive into raw data, export reports, and keep annotations.</p>
+  </header>
+
+  <!-- KPIs -->
+  <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+    <div class="bg-white rounded-xl p-5 shadow flex flex-col gap-2">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="text-xs text-gray-500">Average Mood</div>
+          <div id="kpiAvgMood" class="text-2xl font-bold theme-1">—</div>
+        </div>
+        <div class="text-sm text-gray-400" title="See historical trend">Trend: <span id="kpiAvgMoodTrend">—</span></div>
+      </div>
+      <div class="text-xs text-gray-500">Last 30 days</div>
+    </div>
+
+    <div class="bg-white rounded-xl p-5 shadow flex flex-col gap-2">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="text-xs text-gray-500">Top Symptom</div>
+          <div id="kpiTopSymptom" class="text-2xl font-bold theme-2">—</div>
+        </div>
+        <div class="text-sm text-gray-400">Freq: <span id="kpiTopSymCount">—</span></div>
+      </div>
+      <div class="text-xs text-gray-500">Most reported</div>
+    </div>
+
+    <div class="bg-white rounded-xl p-5 shadow flex flex-col gap-2">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="text-xs text-gray-500">Wellbeing Index</div>
+          <div id="kpiWellbeing" class="text-2xl font-bold theme-1">—</div>
+        </div>
+        <div class="text-sm text-gray-400">Benchmark: <span id="kpiBenchmark">—</span></div>
+      </div>
+      <div class="text-xs text-gray-500">Composite score</div>
+    </div>
+
+    <div class="bg-white rounded-xl p-5 shadow flex flex-col gap-2">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="text-xs text-gray-500">Data Coverage</div>
+          <div id="kpiCoverage" class="text-2xl font-bold theme-3">—</div>
+        </div>
+        <div class="text-sm text-gray-400">Users: <span id="kpiUsers">—</span></div>
+      </div>
+      <div class="text-xs text-gray-500">Last updated: <span id="kpiUpdated">—</span></div>
+    </div>
+  </section>
+
+  <!-- Filters -->
+  <section class="bg-white rounded-xl p-4 shadow mb-8 flex flex-col md:flex-row gap-3 items-center">
+    <div class="flex items-center gap-3 w-full md:w-auto">
+      <label for="timeFilter" class="text-sm text-gray-600">Range</label>
+      <select id="timeFilter" class="p-2 rounded border">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="180">Last 6 months</option>
+        <option value="365">Last year</option>
+        <option value="all">All time</option>
+      </select>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <label class="text-sm text-gray-600">From</label>
+      <input id="startDate" type="date" class="p-2 rounded border" aria-label="Start date" />
+      <label class="text-sm text-gray-600">To</label>
+      <input id="endDate" type="date" class="p-2 rounded border" aria-label="End date" />
+    </div>
+
+    <div class="flex items-center gap-3 ml-auto">
+      <label class="text-sm text-gray-600">Compare</label>
+      <button id="compareModeBtn" class="px-3 py-1 bg-emerald-50 text-emerald-700 rounded border">Select up to 3</button>
+      <button id="applyFilters" class="px-3 py-1 bg-emerald-700 text-white rounded">Apply</button>
+      <button id="resetFilters" class="px-3 py-1 bg-gray-100 rounded">Reset</button>
+    </div>
+  </section>
+
+  <!-- AI Summary -->
+  <section class="bg-gradient-to-r from-emerald-50 to-white border-l-4 border-emerald-600 p-6 rounded-xl shadow mb-10">
+    <div class="flex items-start justify-between">
+      <div>
+        <h2 class="text-2xl font-semibold theme-1">AI Summary</h2>
+        <p id="aiSummary" class="text-gray-700 italic mt-2">Loading AI analysis...</p>
+      </div>
+      <div class="text-xs text-gray-500 text-right">
+        <div>Confidence: <span id="aiConfidence">—</span></div>
+        <div>Model: <span id="aiModel">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Chart Cards Grid -->
+  <section id="cardsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+    <!-- Cards are generated dynamically by JS based on `charts` config -->
+  </section>
+
+  <!-- Explanation / Docs -->
+  <section class="bg-white p-6 rounded-xl shadow mb-12">
+    <h3 class="text-lg font-semibold theme-1 mb-2">Notes for Clinicians</h3>
+    <ul class="list-disc pl-5 text-sm text-gray-700">
+      <li>Data is anonymized for privacy. Patient-level exports require authentication & consent.</li>
+      <li>Benchmarks are population-derived; adjust for demographic matching where possible.</li>
+      <li>AI insights are probabilistic summaries; always use clinical judgment.</li>
+    </ul>
+  </section>
+</main>
+
+<div id="chartModal" class="fixed inset-0 hidden z-50 bg-black/60 p-10 overflow-auto" role="dialog" aria-modal="true">
+  <div class="bg-white rounded-2xl shadow-xl max-w-7xl w-full mx-auto p-6 md:p-8 relative max-h-[90vh] flex flex-col">
+
+    <!-- Sticky Header -->
+    <header class="sticky top-0 bg-white pb-3 border-b flex justify-between items-start z-10">
+      <div>
+        <h2 id="modalTitle" class="text-2xl font-bold text-emerald-900">Chart</h2>
+        <p id="modalSub" class="text-sm text-gray-500">Loading...</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="exportText" class="ml-3">Export As: </button>
+        <button id="exportPNG" class="btn-action ml-5"> PNG</button>
+        <button id="exportPDF" class="btn-action ml-5">PDF</button>
+        <button id="exportCSV" class="btn-action ml-5">CSV</button>
+        <button id="toggleAnnotations" class="btn-action hidden">Annotations</button>
+        <button id="closeModalBtn" class="p-2 text-gray-500 hover:text-emerald-700" aria-label="Close modal">
+          <i data-feather="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="mt-4 border-b pb-3 flex gap-6 text-sm" role="tablist">
+      <button class="tab-btn tab-active" data-tab="chart" aria-selected="true">Chart</button>
+      <button class="tab-btn" data-tab="insights" aria-selected="false">AI Insights</button>
+      <button class="tab-btn" data-tab="data" aria-selected="false">Raw Data</button>
+      <button class="tab-btn" data-tab="recommendations" aria-selected="false">Recommendations</button>
+    </nav>
+
+    <!-- Content -->
+    <div class="mt-6 flex-1 flex gap-6 overflow-hidden">
+      <!-- Chart Area -->
+      <section class="flex-1 min-w-0 overflow-auto pr-1">
+        <div class="bg-white p-3 rounded-lg shadow-sm">
+          <canvas id="modalChartCanvas" role="img" aria-label="Expanded chart"></canvas>
+          <div class="flex items-center gap-3 mt-3">
+            <label class="label-small">Overlay benchmark <input id="overlayBenchmark" type="checkbox" class="ml-1"></label>
+            <label class="label-small ml-3">Show CI <input id="showCI" type="checkbox" class="ml-1" checked></label>
+            <button id="zoomReset" class="btn-action ml-auto">Reset Zoom</button>
+          </div>
+        </div>
+        <div id="compareHelper" class="mt-4 text-xs text-gray-500">
+          Selecting comparison datasets: <span id="compareSelected">0</span>/3
+          <button id="openCompare" class="ml-3 px-2 py-1 text-sm bg-emerald-50 rounded">Open Comparison View</button>
+        </div>
+      </section>
+
+      <!-- Side Panel -->
+      <aside class="w-96 min-w-[260px] overflow-auto border-l pl-4">
+        <!-- Chart Tools -->
+        <div id="tabContentChart" class="tab-content">
+          <h4 class="text-sm font-semibold">Annotations</h4>
+          <textarea id="annotationText" placeholder="Add note (tag: mood, sleep, meds)" class="textarea"></textarea>
+          <div class="flex gap-2 mt-2">
+            <button id="saveAnnotation" class="btn-primary">Save</button>
+            <button id="clearAnnotations" class="btn-action">Clear</button>
+          </div>
+          <div id="annotationsList" class="mt-3 text-xs text-gray-600 space-y-2"></div>
+        </div>
+
+        <!-- AI Insights -->
+        <div id="tabContentInsights" class="tab-content hidden">
+          <div id="aiInsightsBlock" class="space-y-4 text-sm text-gray-700">
+            <section>
+              <h5 class="font-semibold text-emerald-900">Summary</h5>
+              <div class="skeleton h-20 rounded"></div>
+            </section>
+            <section>
+              <h5 class="font-semibold text-emerald-900">Possible Factors</h5>
+              <div class="skeleton h-20 rounded"></div>
+            </section>
+            <section>
+              <h5 class="font-semibold text-emerald-900">Next Steps</h5>
+              <div class="skeleton h-20 rounded"></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Data -->
+        <div id="tabContentData" class="tab-content hidden">
+          <input type="search" placeholder="Search records..." class="w-full p-2 mb-2 border rounded text-sm">
+          <table id="rawDataTable" class="w-full text-xs">
+            <thead class="bg-gray-50 sticky top-0">
+            <tr>
+              <th class="p-2 border text-left">Date</th>
+              <th class="p-2 border">Metric</th>
+              <th class="p-2 border">Value</th>
+              <th class="p-2 border">Notes</th>
+            </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <!-- Recommendations -->
+        <div id="tabContentRecommendations" class="tab-content hidden">
+          <h4 class="text-sm font-semibold">Recommendations</h4>
+          <ul id="recommendationList" class="list-disc pl-4 text-sm text-gray-700 mt-2 space-y-2">
+            <li class="flex items-center gap-2"><input type="checkbox"> Review sleep log</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- Templates & small helpers (hidden) -->
+<template id="chartCardTpl">
+  <div class="bg-white rounded-2xl p-5 shadow card-focus card-entry" tabindex="0">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <div class="text-sm text-gray-500 card-metric"></div>
+        <div class="text-lg font-semibold card-title theme-1"></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" class="compare-checkbox" title="Select for comparison" />
+        <button class="px-2 py-1 bg-gray-50 rounded text-sm view-btn">View</button>
+      </div>
+    </div>
+    <p class="text-xs text-gray-500 mt-2 card-desc"></p>
+    <div class="mt-3">
+      <div class="h-36 rounded skeleton card-chart-placeholder"></div>
+    </div>
+    <div class="mt-3 flex items-center justify-between text-xs">
+      <div class="text-gray-500">Updated: <span class="card-updated">—</span></div>
+      <div class="flex gap-2">
+        <button class="text-emerald-700 text-xs goto-btn">Open</button>
+        <button class="text-gray-400 text-xs export-small">Export</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+  // ========= CONFIG: Define charts available =========
+  const charts = [
+    { key: 'user_mood_trend', title: 'Mood Over Time', metric: 'Mood', desc: 'Daily mood scores and trend.', color: '#065f46' },
+    { key: 'mood_forecast', title: 'Forecasted Mood', metric: 'Mood (pred)', desc: 'Predicted mood values with CI.', color: '#0b5cff' },
+    { key: 'cluster_plot', title: 'Cluster Analysis', metric: 'Cluster', desc: 'Profiles grouped by similarity.', color: '#b45309' },
+    { key: 'national_trend', title: 'National Mood Trend', metric: 'National', desc: 'Aggregated national sentiment.', color: '#065f46' },
+    { key: 'mood_by_region', title: 'Mood by Region', metric: 'Geography', desc: 'Geographic distribution of mood.', color: '#0b5cff' },
+    { key: 'top_symptoms', title: 'Top Symptoms', metric: 'Symptoms', desc: 'Frequency-ranked symptoms.', color: '#b45309' },
+    { key: 'intervention_efficacy', title: 'Intervention Efficacy', metric: 'Intervention', desc: 'Effect sizes by treatment.', color: '#065f46' },
+    { key: 'age_demographics', title: 'Demographics by Age', metric: 'Age', desc: 'Age-stratified metrics.', color: '#0b5cff' }
+  ];
+
+  // ========= state & utils =========
+  let selectedForCompare = new Set();
+  let modalChart = null;
+  let modalChartConfig = null;
+  let annotationsStoreKey = 'annotations_v1';
+  const MAX_COMPARE = 3;
+
+  // Save/restore filter state
+  function saveFilterState() {
+    const state = {
+      timeFilter: document.getElementById('timeFilter').value,
+      startDate: document.getElementById('startDate').value,
+      endDate: document.getElementById('endDate').value
+    };
+    localStorage.setItem('statsFilters', JSON.stringify(state));
+  }
+  function loadFilterState() {
+    const raw = localStorage.getItem('statsFilters');
+    if (!raw) return;
+    try {
+      const s = JSON.parse(raw);
+      if (s.timeFilter) document.getElementById('timeFilter').value = s.timeFilter;
+      if (s.startDate) document.getElementById('startDate').value = s.startDate;
+      if (s.endDate) document.getElementById('endDate').value = s.endDate;
+    } catch(e){/* ignore */ }
+  }
+
+  // Load KPIs (placeholder fetch)
+  async function loadKPIs() {
+    // Example: fetch('/api/stats/kpis?range=30')...
+    // For now we set placeholders; backend will replace
+    document.getElementById('kpiAvgMood').textContent = '3.8 / 5';
+    document.getElementById('kpiAvgMoodTrend').textContent = '↑ 0.2';
+    document.getElementById('kpiTopSymptom').textContent = 'Anxiety';
+    document.getElementById('kpiTopSymCount').textContent = '412';
+    document.getElementById('kpiWellbeing').textContent = '68';
+    document.getElementById('kpiBenchmark').textContent = 'Population: 72';
+    document.getElementById('kpiCoverage').textContent = '78%';
+    document.getElementById('kpiUsers').textContent = '12,352';
+    document.getElementById('kpiUpdated').textContent = new Date().toLocaleString();
+    document.getElementById('aiSummary').textContent = 'Recent uptick in low-mood reports in the 18-25 bracket; recommended follow-up with cognitive interventions and weekly monitoring.';
+    document.getElementById('aiConfidence').textContent = '0.78';
+    document.getElementById('aiModel').textContent = 'ensemble-v2';
+  }
+
+  // Render chart cards
+  function renderCards() {
+    const grid = document.getElementById('cardsGrid');
+    const tpl = document.getElementById('chartCardTpl');
+    charts.forEach(cfg => {
+      const clone = tpl.content.cloneNode(true);
+      const root = clone.querySelector('.card-entry');
+      root.querySelector('.card-title').textContent = cfg.title;
+      root.querySelector('.card-metric').textContent = cfg.metric;
+      root.querySelector('.card-desc').textContent = cfg.desc;
+      root.querySelector('.card-updated').textContent = '—';
+      // set view button
+      const viewBtn = root.querySelector('.view-btn');
+      viewBtn.addEventListener('click', () => openModalFor(cfg.key, cfg));
+      // comparison checkbox
+      const cb = root.querySelector('.compare-checkbox');
+      cb.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          if (selectedForCompare.size >= MAX_COMPARE) {
+            alert('You can compare up to ' + MAX_COMPARE + ' datasets.');
+            e.target.checked = false;
+            return;
+          }
+          selectedForCompare.add(cfg.key);
+        } else {
+          selectedForCompare.delete(cfg.key);
+        }
+        document.getElementById('compareSelected').textContent = selectedForCompare.size;
+      });
+
+      // small export placeholder
+      const exportBtn = clone.querySelector('.export-small');
+      exportBtn.addEventListener('click', () => alert('Export will be implemented — backend needed to retrieve CSV/PDF.'));
+
+      // keyboard accessible: Enter opens
+      root.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') openModalFor(cfg.key, cfg);
+      });
+
+      grid.appendChild(clone);
+    });
+  }
+
+  // Open modal for chart key
+  async function openModalFor(key, cfg = {}) {
+    const modal = document.getElementById('chartModal');
+    document.getElementById('modalTitle').textContent = cfg.title || key;
+    document.getElementById('modalSub').textContent = cfg.desc || '';
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden','false');
+
+    // default to chart tab
+    setActiveTab('chart');
+
+    // load AI insights
+    loadAIInsights(key);
+    // load raw data
+    loadRawData(key);
+    // prepare chart
+    await renderModalChart(key, cfg);
+    loadAnnotations(key);
+  }
+
+  function closeModal() {
+    const modal = document.getElementById('chartModal');
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden','true');
+    // destroy chart to free memory
+    if (modalChart) {
+      modalChart.destroy();
+      modalChart = null;
+    }
+  }
+
+  document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  // Tabbing inside modal
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+      btn.classList.add('tab-active');
+      const tab = btn.dataset.tab;
+      setActiveTab(tab);
+    });
+  });
+  function setActiveTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    const map = {
+      chart: 'tabContentChart',
+      insights: 'tabContentInsights',
+      data: 'tabContentData',
+      recommendations: 'tabContentRecommendations'
+    };
+    const el = document.getElementById(map[tab]);
+    if (el) el.classList.remove('hidden');
+  }
+
+  // ========== fetching & rendering modal chart ==========
+  async function renderModalChart(key, cfg) {
+    // show skeleton placeholder while fetching
+    const canvas = document.getElementById('modalChartCanvas');
+    canvas.width = canvas.clientWidth * devicePixelRatio;
+    canvas.height = 360 * devicePixelRatio;
+
+    // fetch data from backend: expected JSON { labels: [...], datasets: [{label, data, backgroundColor, borderColor, ci?}, ...] }
+    let data;
+    try {
+      const params = getFilterParams();
+      const resp = await fetch(`/api/stats/${encodeURIComponent(key)}?${params}`);
+      if (!resp.ok) throw new Error('No data');
+      data = await resp.json();
+    } catch (err) {
+      // fallback: generate synthetic demo data for offline use
+      data = demoDataFor(key);
+    }
+
+    // destroy previous chart
+    if (modalChart) modalChart.destroy();
+
+    // build datasets (support CI shading if available)
+    const datasets = (data.datasets || []).map(ds => {
+      return {
+        label: ds.label,
+        data: ds.data.map((v,i) => ({x: data.labels[i], y: v})),
+        borderColor: ds.borderColor || cfg.color || '#065f46',
+        backgroundColor: ds.backgroundColor || 'transparent',
+        tension: 0.25,
+        fill: false,
+        pointRadius: 3
+      };
+    });
+
+    const ctx = canvas.getContext('2d');
+    modalChart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets },
+      options: {
+        parsing: false,
+        animation: { duration: 350 },
+        plugins: {
+          legend: { position: 'top' },
+          zoom: {
+            pan: { enabled: true, mode: 'x', modifierKey: 'ctrl' },
+            zoom: {
+              wheel: { enabled: true },
+              pinch: { enabled: true },
+              mode: 'x'
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ${ctx.formattedValue}`
+            }
+          },
+          annotation: {}
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: { parser: 'iso', tooltipFormat: 'MMM dd, yyyy', unit: 'day' },
+            title: { display: true, text: 'Date' }
+          },
+          y: {
+            title: { display: true, text: data.yLabel || 'Value' },
+            suggestedMin: data.suggestedMin,
+            suggestedMax: data.suggestedMax
+          }
+        }
+      }
+    });
+
+    // threshold highlighting: detect large drops / spikes & mark
+    highlightCriticalShifts(modalChart, data);
+
+    // wire zoom reset
+    document.getElementById('zoomReset').onclick = () => modalChart.resetZoom();
+
+    // overlay benchmark toggle
+    document.getElementById('overlayBenchmark').onchange = (e) => {
+      if (e.target.checked && data.benchmark) {
+        // add benchmark dataset
+        modalChart.data.datasets.push({
+          label: 'Benchmark',
+          data: data.benchmark.data.map((v,i) => ({x: data.labels[i], y: v})),
+          borderColor: '#9ca3af',
+          borderDash: [6,4],
+          pointRadius: 0,
+          fill: false
+        });
+      } else {
+        modalChart.data.datasets = modalChart.data.datasets.filter(d => d.label !== 'Benchmark');
+      }
+      modalChart.update();
+    };
+
+    // show CI checkbox
+    document.getElementById('showCI').onchange = (e) => {
+      // naive: if CI exists, re-render using area fill for dataset 0
+      if (e.target.checked && data.datasets[0]?.ci) {
+        // draw filled band for CI (quick approach: create dataset behind primary)
+        const ci = data.datasets[0].ci; // {lower:[], upper:[]}
+        const labels = data.labels;
+        const band = {
+          label: 'CI',
+          data: labels.map((l,i) => ({x:l, y: ci.upper[i]})).concat(labels.slice().reverse().map((l,i) => ({x: labels[labels.length-1-i], y: ci.lower[labels.length-1-i]}))),
+          borderColor: 'rgba(0,0,0,0)',
+          backgroundColor: 'rgba(6,95,70,0.06)',
+          fill: true,
+          pointRadius: 0,
+          parsing: false
+        };
+        // remove existing CI if any
+        modalChart.data.datasets = modalChart.data.datasets.filter(d => d.label !== 'CI');
+        modalChart.data.datasets.unshift(band);
+      } else {
+        modalChart.data.datasets = modalChart.data.datasets.filter(d => d.label !== 'CI');
+      }
+      modalChart.update();
+    };
+  }
+
+  // highlight critical shifts (very simple algorithm for demo)
+  function highlightCriticalShifts(chart, data) {
+    // detect > 20% drop between adjacent points and annotate
+    const ds = data.datasets && data.datasets[0] && data.datasets[0].data;
+    if (!ds || ds.length < 3) return;
+    const annotations = [];
+    for (let i=1;i<ds.length;i++){
+      if (ds[i-1] === 0) continue;
+      const change = (ds[i] - ds[i-1]) / Math.abs(ds[i-1]);
+      if (Math.abs(change) >= 0.25) {
+        annotations.push({index: i, change});
+      }
+    }
+    // add custom shapes or console warnings — Chart.js annotation plugin would be better when available
+    if (annotations.length > 0) {
+      // visually mark by changing pointStyle of extreme points
+      annotations.forEach(a => {
+        if (chart.data.datasets[0] && chart.data.datasets[0].data[a.index]) {
+          chart.data.datasets[0].pointRadius = 4;
+        }
+      });
+      chart.update();
+    }
+  }
+
+  // demo fallback data if backend not available
+  function demoDataFor(key) {
+    const days = 30;
+    const labels = [];
+    const datasets = [{ label: 'Value', data: [] }];
+    for (let i=days-1;i>=0;i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      labels.push(d.toISOString());
+      datasets[0].data.push( Math.round( (Math.sin(i/5)*0.5 + 0.5) * 5 + 0.5 ) );
+    }
+    return { labels, datasets, yLabel: 'Score', suggestedMin: 0, suggestedMax: 5 };
+  }
+
+  // load AI insights for modal
+  async function loadAIInsights(key) {
+    const block = document.getElementById('aiInsightsBlock');
+    // try fetch
+    try {
+      const params = getFilterParams();
+      const res = await fetch(`/api/ai_insights/${encodeURIComponent(key)}?${params}`);
+      if (!res.ok) throw new Error('no ai');
+      const js = await res.json();
+      block.innerHTML = `<p class="text-sm text-gray-700">${escapeHtml(js.summary || 'No insight')}</p>
+                         <div class="mt-2 text-xs text-gray-500">Confidence: ${js.confidence ?? '—'}</div>`;
+    } catch (e) {
+      // fallback
+      block.innerHTML = `<p class="text-sm text-gray-700">AI summary unavailable (backend offline). Example: Rising low-mood reports in younger adults.</p>`;
+    }
+  }
+
+  // load raw data for modal
+  async function loadRawData(key) {
+    const tbody = document.querySelector('#rawDataTable tbody');
+    tbody.innerHTML = '';
+    try {
+      const params = getFilterParams();
+      const res = await fetch(`/api/stats/raw/${encodeURIComponent(key)}?${params}`);
+      if (!res.ok) throw new Error('no raw');
+      const js = await res.json(); // expect array of records {date, metric, value, notes}
+      js.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td class="p-2 border text-xs">${r.date}</td><td class="p-2 border text-xs">${escapeHtml(r.metric||'')}</td><td class="p-2 border text-xs">${escapeHtml(String(r.value))}</td><td class="p-2 border text-xs">${escapeHtml(r.notes||'')}</td>`;
+        tbody.appendChild(tr);
+      });
+    } catch(e) {
+      // fallback demo
+      for(let i=0;i<10;i++){
+        const d = new Date(); d.setDate(d.getDate()-i);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td class="p-2 border text-xs">${d.toISOString().slice(0,10)}</td><td class="p-2 border text-xs">Mood</td><td class="p-2 border text-xs">${(Math.random()*5).toFixed(1)}</td><td class="p-2 border text-xs">demo note</td>`;
+        tbody.appendChild(tr);
+      }
+    }
+  }
+
+  // Export functions
+  function exportCanvasPNG() {
+    if (!modalChart) return alert('Chart not ready');
+    const uri = document.getElementById('modalChartCanvas').toDataURL('image/png');
+    // use FileSaver
+    const blob = dataURItoBlob(uri);
+    saveAs(blob, 'chart.png');
+  }
+  async function exportCanvasPDF() {
+    if (!modalChart) return alert('Chart not ready');
+    const uri = document.getElementById('modalChartCanvas').toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape' });
+    const imgProps = pdf.getImageProperties(uri);
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = (imgProps.height * pdfW) / imgProps.width;
+    pdf.addImage(uri, 'PNG', 0, 10, pdfW, pdfH);
+    pdf.save('chart.pdf');
+  }
+  function exportCSV(key) {
+    // fetch raw data and build CSV
+    fetch(`/api/stats/raw/${encodeURIComponent(key)}?${getFilterParams()}`).then(r => r.ok ? r.json() : Promise.reject()).then(js => {
+      const rows = [['date','metric','value','notes']];
+      js.forEach(r => rows.push([r.date, r.metric, r.value, r.notes || '']));
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+      saveAs(blob, `${key}.csv`);
+    }).catch(()=> alert('CSV export failed (backend required)'));
+  }
+
+  // helper: dataURI -> blob
+  function dataURItoBlob(dataURI) {
+    const byteString = atob(dataURI.split(',')[1]);
+    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+    return new Blob([ab], { type: mimeString });
+  }
+
+  // basic CSV export for visible raw table
+  function exportRawTableCSV() {
+    const rows = Array.from(document.querySelectorAll('#rawDataTable tr')).map(tr => Array.from(tr.children).map(td => td.textContent.trim()));
+    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g,'""')}"`).join(',')).join('\n');
+    saveAs(new Blob([csv], {type:'text/csv;charset=utf-8;'}), 'raw_data.csv');
+  }
+
+  // annotations (local storage)
+  function loadAnnotations(key) {
+    const map = JSON.parse(localStorage.getItem(annotationsStoreKey) || '{}');
+    const annotations = map[key] || [];
+    const list = document.getElementById('annotationsList');
+    list.innerHTML = '';
+    annotations.forEach((a, idx) => {
+      const d = document.createElement('div');
+      d.className = 'text-xs bg-emerald-50 p-2 rounded';
+      d.innerHTML = `<div>${escapeHtml(a.text)}</div><div class="text-gray-400 text-[11px]">Saved: ${new Date(a.t).toLocaleString()}</div>`;
+      list.appendChild(d);
+    });
+    document.getElementById('saveAnnotation').onclick = () => {
+      const val = document.getElementById('annotationText').value.trim();
+      if (!val) return alert('Write a note first.');
+      const now = Date.now();
+      map[currentModalKey()] = map[currentModalKey()] || [];
+      map[currentModalKey()].push({ text: val, t: now });
+      localStorage.setItem(annotationsStoreKey, JSON.stringify(map));
+      document.getElementById('annotationText').value = '';
+      loadAnnotations(currentModalKey());
+    };
+    document.getElementById('clearAnnotations').onclick = () => {
+      if (!confirm('Clear annotations for this view?')) return;
+      map[currentModalKey()] = [];
+      localStorage.setItem(annotationsStoreKey, JSON.stringify(map));
+      loadAnnotations(currentModalKey());
+    };
+  }
+
+  function currentModalKey() {
+    // use modal title as key fallback
+    return document.getElementById('modalTitle').textContent.replace(/\s+/g,'_').toLowerCase();
+  }
+
+  // get filter params string
+  function getFilterParams() {
+    const tf = document.getElementById('timeFilter').value;
+    const s = document.getElementById('startDate').value;
+    const e = document.getElementById('endDate').value;
+    const params = new URLSearchParams();
+    params.set('range', tf);
+    if (s) params.set('start', s);
+    if (e) params.set('end', e);
+    return params.toString();
+  }
+
+  // small helper: escape html
+  function escapeHtml(str){ return String(str||'').replace(/[&<>"']/g, (m)=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  // compare selected datasets (open comparison view)
+  async function openComparisonView() {
+    if (selectedForCompare.size < 2) return alert('Select at least 2 datasets to compare.');
+    const keys = Array.from(selectedForCompare);
+    // for simplicity reuse modal and render multiple datasets together
+    document.getElementById('modalTitle').textContent = 'Comparison';
+    setActiveTab('chart');
+    const canvas = document.getElementById('modalChartCanvas');
+    if (modalChart) modalChart.destroy();
+
+    // fetch data for each key
+    const datasets = [];
+    let commonLabels = null;
+    for (const k of keys) {
+      try {
+        const params = getFilterParams();
+        const res = await fetch(`/api/stats/${encodeURIComponent(k)}?${params}`);
+        const js = res.ok ? await res.json() : demoDataFor(k);
+        if (!commonLabels) commonLabels = js.labels;
+        datasets.push(...(js.datasets || []).map((ds, idx) => ({
+          label: `${k} - ${ds.label}`,
+          data: ds.data.map((v,i) => ({x: js.labels[i], y: v})),
+          borderColor: ds.borderColor || randomColorFor(k),
+          pointRadius: 2,
+          tension: 0.2
+        })));
+      } catch(e){ /* ignore */ }
+    }
+    const ctx = canvas.getContext('2d');
+    modalChart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets },
+      options: { parsing:false, plugins:{legend:{position:'top'}, zoom:{pan:{enabled:true,mode:'x'},zoom:{wheel:{enabled:true},mode:'x'}}}, scales:{x:{type:'time',time:{parser:'iso',unit:'day'}}} }
+    });
+    document.getElementById('chartModal').classList.remove('hidden');
+    document.getElementById('compareSelected').textContent = selectedForCompare.size;
+  }
+
+  function randomColorFor(key) {
+    const colors = ['#065f46','#0b5cff','#b45309','#7c3aed','#0ea5a4'];
+    let h = 0; for (let i=0;i<key.length;i++) h = (h<<5)-h + key.charCodeAt(i);
+    return colors[Math.abs(h) % colors.length];
+  }
+
+  // wire compare open button
+  document.getElementById('openCompare').addEventListener('click', openComparisonView);
+  document.getElementById('compareModeBtn').addEventListener('click', () => alert('Select up to three checkboxes on cards then click "Open Comparison View".'));
+
+  // wire export buttons on modal
+  document.getElementById('exportPNG').addEventListener('click', exportCanvasPNG);
+  document.getElementById('exportPDF').addEventListener('click', exportCanvasPDF);
+  document.getElementById('exportCSV').addEventListener('click', () => exportCSV(currentModalKey()));
+
+  // apply/reset filters
+  document.getElementById('applyFilters').addEventListener('click', () => {
+    saveFilterState();
+    // reload KPIs & cards (in production we'd fetch updated cards)
+    loadKPIs();
+    alert('Filters applied. Charts will refresh when you open them.');
+  });
+  document.getElementById('resetFilters').addEventListener('click', () => {
+    localStorage.removeItem('statsFilters');
+    loadFilterState();
+    loadKPIs();
+    alert('Filters reset.');
+  });
+
+  // helper: CSV button on modal top
+  document.getElementById('exportCSV').addEventListener('dblclick', exportRawTableCSV);
+
+  // DOM ready init
+  (function init(){
+    feather.replace();
+    loadFilterState();
+    renderCards();
+    loadKPIs();
+    // attach resize handling (re-render charts if open)
+    window.addEventListener('resize', () => {
+      if (modalChart) modalChart.resize();
+    });
+
+    // default tab content skeleton cleanup
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.add('hidden'));
+    document.getElementById('tabContentChart').classList.remove('hidden');
+  })();
+</script>
+</body>
+</html>

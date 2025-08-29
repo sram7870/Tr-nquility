@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI-Guided Mental Health Journal</title>
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Trebuchet MS"', 'Helvetica', 'sans-serif']
+                    },
+                    colors: {
+                        primaryGreen: {
+                            DEFAULT: '#256d3b',
+                            light: '#4a9867',
+                            dark: '#1d502a',
+                        },
+                        offwhite: '#f8faf6',
+                        calmGray: {
+                            light: '#e6e8e3',
+                            DEFAULT: '#9ca3af',
+                            dark: '#6b7280',
+                        }
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: 0, transform: 'translateY(10px)' },
+                            '100%': { opacity: 1, transform: 'translateY(0)' }
+                        }
+                    },
+                    animation: {
+                        fadeIn: 'fadeIn 0.5s ease-out forwards'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f8faf6;
+            font-family: "Trebuchet MS", Helvetica, sans-serif;
+        }
+        .mood-btn {
+            border-radius: 9999px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            padding: 0.5rem 0.75rem;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        .mood-btn:hover {
+            transform: scale(1.1);
+        }
+        .mood-btn.selected {
+            border-color: #256d3b;
+            background-color: #d1fae5;
+        }
+    </style>
+</head>
+<body class="text-primaryGreen font-sans">
+
+<nav class="bg-[#f9f9f6] backdrop-blur-md shadow-sm border-b border-gray-200 py-4 px-8 flex items-center justify-between sticky top-0 z-50">
+    <div class="flex items-center space-x-3">
+        <span class="text-lg font-bold text-[#2f5930] tracking-wide">Dashboard</span>
+    </div>
+    <div class="flex space-x-6 text-sm font-medium">
+        <a href="/journal" class="text-gray-600 hover:text-[#2f5930]">Journal</a>
+        <a href="/stats" class="text-gray-600 hover:text-[#2f5930]">Statistics</a>
+        <a href="/info" class="text-gray-600 hover:text-[#2f5930]">Info</a>
+    </div>
+</nav>
+
+<main class="max-w-7xl mx-auto py-10 px-6 animate-fadeIn">
+    <header class="mb-10 text-center">
+        <h1 class="text-5xl font-bold mb-3">AI-Guided Mental Health Journal</h1>
+        <p class="text-primaryGreen-dark text-lg">Personalized prompts, live guidance, and insights to deepen your self-reflection.</p>
+    </header>
+
+    <!-- Date & Actions -->
+    <section class="flex gap-4 mb-6 flex-wrap items-center justify-center">
+        <label for="currentDate" class="font-semibold text-primaryGreen-dark">Date:</label>
+        <input type="date" id="currentDate" class="border border-calmGray rounded px-3 py-1 focus:outline-none focus:border-primaryGreen" />
+        <button id="loadEntryBtn" class="bg-primaryGreen hover:bg-primaryGreen-dark text-offwhite px-5 py-2 rounded font-semibold shadow-md">Load / Create Entry</button>
+        <button id="saveBtn" class="bg-primaryGreen hover:bg-primaryGreen-dark text-offwhite px-5 py-2 rounded font-semibold shadow-md" disabled>Save Entry</button>
+    </section>
+
+    <!-- Main journaling area -->
+    <section class="bg-white rounded-3xl shadow-xl p-8 mb-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Editor Column -->
+        <div class="lg:col-span-2 flex flex-col">
+            <label class="block mb-2 font-semibold text-primaryGreen-dark">Your Journal Entry:</label>
+            <div id="editor" class="border border-calmGray rounded-xl bg-white" style="height:300px"></div>
+
+            <!-- Mood selector -->
+            <div class="mt-6">
+                <label class="block mb-2 font-semibold text-primaryGreen-dark">Mood Today:</label>
+                <div id="moodSelector" class="flex gap-5 flex-wrap">
+                    <button class="mood-btn" data-mood="happy">😊</button>
+                    <button class="mood-btn" data-mood="calm">😌</button>
+                    <button class="mood-btn" data-mood="neutral">😐</button>
+                    <button class="mood-btn" data-mood="sad">😔</button>
+                    <button class="mood-btn" data-mood="anxious">😟</button>
+                    <button class="mood-btn" data-mood="angry">😠</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Guidance Column -->
+        <div class="bg-offwhite border border-primaryGreen rounded-2xl p-4 flex flex-col gap-4">
+            <h3 class="font-semibold text-lg text-primaryGreen-dark">AI Guidance</h3>
+            <div id="aiPromptBox" class="text-sm text-primaryGreen-dark italic">Select a mood to receive a personalized prompt...</div>
+            <div class="flex gap-2">
+                <button id="newPromptBtn" class="flex-1 bg-primaryGreen hover:bg-primaryGreen-dark text-white px-3 py-2 rounded">New Prompt</button>
+                <button id="clearPromptBtn" class="flex-1 bg-calmGray hover:bg-calmGray-dark text-white px-3 py-2 rounded">Clear</button>
+            </div>
+            <hr>
+            <div>
+                <h4 class="font-semibold mb-2">Live Suggestions</h4>
+                <div id="liveSuggestions" class="text-sm text-primaryGreen-dark space-y-1 max-h-40 overflow-y-auto"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- AI Insights -->
+    <section class="bg-white rounded-3xl shadow-xl p-8 mb-10">
+        <h2 class="text-2xl font-semibold mb-4 text-primaryGreen-dark">AI Insights & Analysis</h2>
+        <div class="flex flex-wrap gap-4 mb-4">
+            <button id="sentimentBtn" class="bg-primaryGreen hover:bg-primaryGreen-dark text-white px-4 py-2 rounded">Analyze Sentiment</button>
+            <button id="summaryBtn" class="bg-primaryGreen hover:bg-primaryGreen-dark text-white px-4 py-2 rounded">Generate Summary</button>
+            <button id="patternsBtn" class="bg-primaryGreen hover:bg-primaryGreen-dark text-white px-4 py-2 rounded">Detect Patterns</button>
+        </div>
+        <div id="aiOutput" class="p-4 bg-offwhite border border-primaryGreen rounded-xl min-h-[150px] whitespace-pre-wrap text-primaryGreen-dark text-base"></div>
+    </section>
+
+    <!-- Mindfulness -->
+    <section class="bg-white rounded-3xl shadow-xl p-8">
+        <h2 class="text-2xl font-semibold mb-4 text-primaryGreen-dark">Mindfulness Exercises</h2>
+        <div>
+            <p class="mb-2">After completing an exercise, AI will ask how you feel and log changes.</p>
+            <button id="startBreathingBtn" class="bg-primaryGreen hover:bg-primaryGreen-dark text-white px-4 py-2 rounded">3-Min Breathing</button>
+            <div id="breathingTimer" class="inline-block ml-4 font-mono text-lg">03:00</div>
+        </div>
+    </section>
+</main>
+
+<script>
+    // Initialize Quill
+    const quill = new Quill("#editor", {
+        theme: "snow",
+        placeholder: "Write your thoughts here..."
+    });
+
+    // Mood prompts
+    const prompts = {
+        happy: ["What brought you joy today?", "How can you create more moments like this?"],
+        calm: ["What helped you feel calm today?", "How can you carry this feeling into tomorrow?"],
+        neutral: ["What's something small you noticed today?", "What do you want to explore more deeply?"],
+        sad: ["What's been weighing on your heart?", "What small comfort can you give yourself?"],
+        anxious: ["What thoughts keep looping in your mind?", "What's one thing you can control today?"],
+        angry: ["What's behind your frustration?", "How might you express it constructively?"]
+    };
+
+    const moodBtns = document.querySelectorAll('.mood-btn');
+    const aiPromptBox = document.getElementById('aiPromptBox');
+
+    moodBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            moodBtns.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            const mood = btn.dataset.mood;
+            const p = prompts[mood][Math.floor(Math.random()*prompts[mood].length)];
+            aiPromptBox.textContent = p;
+        });
+    });
+
+    // New Prompt button
+    document.getElementById('newPromptBtn').addEventListener('click', () => {
+        const selectedMood = document.querySelector('.mood-btn.selected');
+        if (!selectedMood) return;
+        const mood = selectedMood.dataset.mood;
+        const p = prompts[mood][Math.floor(Math.random()*prompts[mood].length)];
+        aiPromptBox.textContent = p;
+    });
+
+    // Clear prompt
+    document.getElementById('clearPromptBtn').addEventListener('click', () => {
+        aiPromptBox.textContent = "Select a mood to receive a personalized prompt...";
+    });
+
+    // Live suggestions (placeholder AI logic)
+    quill.on('text-change', () => {
+        const text = quill.getText().trim();
+        if (text.split(' ').length % 15 === 0) {
+            const suggestion = "Have you explored how this connects to your feelings earlier today?";
+            const suggestionsBox = document.getElementById('liveSuggestions');
+            const el = document.createElement('div');
+            el.textContent = suggestion;
+            suggestionsBox.appendChild(el);
+        }
+    });
+</script>
+
+</body>
+</html>
